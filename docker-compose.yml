@@ -1,0 +1,25 @@
+services:
+  analyzer:
+    build: ./analyzer
+    ports:
+      - "8000:8000"
+
+  server:
+    build: ./server
+    env_file: ./server/.env
+    environment:
+      ANALYZER_URL: http://analyzer:8000
+    ports:
+      - "5000:5000"
+    depends_on:
+      - analyzer
+
+  client:
+    build:
+      context: ./client/client
+      args:
+        VITE_API_URL: http://localhost:5000
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
