@@ -1,11 +1,26 @@
-import axios from "axios";
+   import axios from "axios";
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL });
+   const api = axios.create({
+     baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+   });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+   api.interceptors.request.use((config) => {
+     const token = localStorage.getItem("token");
+     if (token) config.headers.Authorization = `Bearer ${token}`;
+     return config;
+   });
 
-export default api;
+   api.interceptors.response.use(
+     (res) => res,
+     (err) => {
+       const url = err.config?.url || "";
+       const isAuthCall = url.startsWith("/auth/login") || url.startsWith("/auth/register");
+       if (err.response?.status === 401 && !isAuthCall && window.location.pathname !== "/login") {
+         localStorage.removeItem("token");
+         window.location.href = "/login";
+       }
+       return Promise.reject(err);
+     }
+   );
+
+   export default api;
