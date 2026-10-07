@@ -1,60 +1,47 @@
 import re
-
 from .skills import SKILLS, ALIAS_TO_CANON
 
 
-def normalize(text: str) -> str:
-    text = text.lower()
-    text = text.replace("-", " ")
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+def _pattern(alias: str) -> re.Pattern:
+    # whole-word match: "java" must not match inside "javascript",
+    # and "js" must not match inside "node.js"
+    return re.compile(
+        r"(?<![A-Za-z0-9+#.])" + re.escape(alias) + r"(?![A-Za-z0-9+#])",
+        re.IGNORECASE,
+    )
 
 
-def extract_skills(text: str) -> list[str]:
-    normalized_text = normalize(text)
-
-    found = set()
-
-    for skill in SKILLS:
-        normalized_skill = normalize(skill)
-
-        pattern = r"(?<!\w)" + re.escape(normalized_skill) + r"(?!\w)"
-
-        if re.search(pattern, normalized_text):
-            canonical = ALIAS_TO_CANON.get(skill, skill)
-            found.add(canonical)
-
-    return sorted(found)
+_PATTERNS = {
+    canon: [_pattern(a) for a in {canon, *aliases}]
+    for canon, aliases in SKILLS.items()
+}
 
 
-def analyze(job_description: str, resume_skills: list[str]):
-    job_skills = extract_skills(job_description)
-
-    resume_normalized = {
-        ALIAS_TO_CANON.get(normalize(skill), normalize(skill))
-        for skill in resume_skills
+def extract_skills(text: str) -> set[str]:
+    return {
+        canon
+        for canon, patterns in _PATTERNS.items()
+        if any(p.search(text) for p in patterns)
     }
 
-    matched_skills = [
-        skill for skill in job_skills
-        if skill in resume_normalized
-    ]
 
-    missing_skills = [
-        skill for skill in job_skills
-        if skill not in resume_normalized
-    ]
+def normalize(skill: str) -> str:
+    s = skill.strip().lower()
+    return ALIAS_TO_CANON.get(s, s)
 
-    if job_skills:
-        match_score = round(
-            (len(matched_skills) / len(job_skills)) * 100
-        )
-    else:
-        match_score = 0
+
+def analyze(job_description: str, resume_skills: list[str]) -> dict:
+    required = extract_skills(job_description)
+    have = {normalize(s) for s in resume_skills if s.strip()}
+
+    matched = sorted(required & have)
+    missing = sorted(required - have)
+    score = round(len(matched) / len(required) * 100) if required else None
 
     return {
-        "jobSkills": job_skills,
-        "matchedSkills": sorted(matched_skills),
-        "missingSkills": sorted(missing_skills),
-        "matchScore": match_score,
+        "matchScore": score,
+        "requiredSkills": sorted(required),
+        "jobSkills": sorted(required),
+        "matchedSkills": matched,
+        "missingSkills": missing,
     }

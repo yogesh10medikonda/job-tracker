@@ -17,7 +17,12 @@ export default function Dashboard() {
   const [view, setView] = useState("board");
   const [statsKey, setStatsKey] = useState(0);
   const [editing, setEditing] = useState(null);
-
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!loading) { setSlow(false); return; }
+    const t = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(t);
+  }, [loading]);
   const refreshStats = () => setStatsKey((k) => k + 1);
 
   const load = useCallback(async () => {
@@ -105,7 +110,9 @@ export default function Dashboard() {
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {loading ? (
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">
+            {slow ? "Waking up the server (free hosting sleeps when idle). This can take up to a minute..." : "Loading..."}
+          </p>
         ) : view === "board" ? (
           <KanbanBoard apps={apps} onStatusChange={changeStatus} onEdit={setEditing} />
         ) : (
